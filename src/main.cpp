@@ -2,6 +2,8 @@
 #include "driver/mcpwm.h"
 
 volatile uint16_t duty = 0;
+const uint8_t DL_PIN = GPIO_NUM_26;
+const uint8_t DR_PIN = GPIO_NUM_14;
 
 void IRAM_ATTR onButtonUp() {
   if (duty < UINT16_MAX) duty++;
@@ -30,9 +32,11 @@ void setup() {
 
   // ピン設定
   Serial.println("mcpwm pin setup");
+  pinMode(DL_PIN, OUTPUT); // DL
+  pinMode(DR_PIN, OUTPUT); // DR
   mcpwm_pin_config_t pinConfig;
-  pinConfig.mcpwm0a_out_num = GPIO_NUM_16;
-  pinConfig.mcpwm0b_out_num = GPIO_NUM_17;
+  pinConfig.mcpwm0a_out_num = GPIO_NUM_25; // UL
+  pinConfig.mcpwm0b_out_num = GPIO_NUM_27; // UR
   pinConfig.mcpwm_fault0_in_num = GPIO_NUM_39;  // limH
   pinConfig.mcpwm_fault1_in_num = GPIO_NUM_36;  // limL
   mcpwm_set_pin(MCPWM_UNIT_0, &pinConfig);
@@ -59,10 +63,15 @@ void setup() {
   Serial.println("freq: " + String(freq));
   mcpwm_set_frequency(MCPWM_UNIT_0, MCPWM_TIMER_0, freq);
 
+  /*
   // deadtime
   uint32_t red = 10, fed = 50;  //deadtime[100ns]
   mcpwm_deadtime_enable(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_ACTIVE_HIGH_COMPLIMENT_MODE, red, fed);
   //mcpwm_deadtime_disable(MCPWM_UNIT_0, MCPWM_TIMER_0);
+  */
+
+  mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_1, MCPWM_OPR_B);
+  mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_1, MCPWM_OPR_A);
 }
 
 void loop() {
@@ -70,47 +79,74 @@ void loop() {
   Serial.println("mcpwm test");
   delay(500);
   
+  /*
   // 1000[ms]動かす
   Serial.println("mcpwm start 1000[ms]");
   mcpwm_start(MCPWM_UNIT_0, MCPWM_TIMER_0);
   delay(1000);
   mcpwm_stop(MCPWM_UNIT_0, MCPWM_TIMER_0);
   delay(1000);
+  */
 
-  Serial.println("mcpwm signal test");
-  delay(500);
-
+  /*
   // 出力固定
+  Serial.println("mcpwm signal test");
   mcpwm_set_signal_high(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A);
   mcpwm_set_signal_high(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B);
   delay(1000);
   mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A);
   mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B);
   delay(1000);
+  */
 
   Serial.println("mcpwm duty test");
   delay(500);
 
   // duty変更
   mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, MCPWM_DUTY_MODE_0); // duty比呼び戻し
-  mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, MCPWM_DUTY_MODE_1); // duty比呼び戻し
+  mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, MCPWM_DUTY_MODE_0); // duty比呼び戻し
   mcpwm_start(MCPWM_UNIT_0,MCPWM_TIMER_0);
   delay(500);
   float duty_percent = 0;
-  for (size_t i = 0; i < 1000; i++) {
+  for (int i = -1000; i < 1000; i++) {
     duty_percent = i / 10.0;
     esp_err_t e;
-    e = mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, duty_percent);
-    if (e != ESP_OK) Serial.println("error: " + String(e));
-    e = mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, 100.0 - duty_percent);
+
+    // 正転
+    if (i > 0) {
+      mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B);
+      digitalWrite(DL_PIN, LOW);
+      e = mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, duty_percent);
+      digitalWrite(DR_PIN, HIGH);
+      mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, MCPWM_DUTY_MODE_0);
+    }
+    //deadtime
+    else if(i == 0) {
+      mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B);
+      digitalWrite(DL_PIN, LOW);
+      mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A);
+      digitalWrite(DR_PIN, LOW);
+      delay(100);
+    }
+    //逆転
+    else {
+      mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A);
+      digitalWrite(DR_PIN, LOW);
+      e = mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, -duty_percent);
+      digitalWrite(DL_PIN, HIGH);
+      mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, MCPWM_DUTY_MODE_0);
+    }
+
     if (e != ESP_OK) Serial.println("error: " + String(e));
     Serial.println("mcpwm duty[%]: " + String(duty_percent));
     delay(100);
   }
   delay(1000);
+  /*
   uint32_t duty_us = 0;
   mcpwm_set_duty_in_us(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, duty_us);
   delay(1000);
+  */
 
 /*
   // fault handler（LOW->HIのみ対応）
