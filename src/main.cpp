@@ -2,8 +2,8 @@
 #include "driver/mcpwm.h"
 
 volatile uint16_t duty = 0;
-const uint8_t DL_PIN = GPIO_NUM_26;
-const uint8_t DR_PIN = GPIO_NUM_14;
+const uint8_t UL_PIN = GPIO_NUM_25;
+const uint8_t UR_PIN = GPIO_NUM_27;
 
 void IRAM_ATTR onButtonUp() {
   if (duty < UINT16_MAX) duty++;
@@ -32,11 +32,11 @@ void setup() {
 
   // ピン設定
   Serial.println("mcpwm pin setup");
-  pinMode(DL_PIN, OUTPUT); // DL
-  pinMode(DR_PIN, OUTPUT); // DR
+  pinMode(UL_PIN, OUTPUT); // UL
+  pinMode(UR_PIN, OUTPUT); // UR
   mcpwm_pin_config_t pinConfig;
-  pinConfig.mcpwm0a_out_num = GPIO_NUM_25; // UL
-  pinConfig.mcpwm0b_out_num = GPIO_NUM_27; // UR
+  pinConfig.mcpwm0a_out_num = GPIO_NUM_14; // DL
+  pinConfig.mcpwm0b_out_num = GPIO_NUM_26; // DR
   pinConfig.mcpwm_fault0_in_num = GPIO_NUM_39;  // limH
   pinConfig.mcpwm_fault1_in_num = GPIO_NUM_36;  // limL
   mcpwm_set_pin(MCPWM_UNIT_0, &pinConfig);
@@ -115,25 +115,25 @@ void loop() {
     // 正転
     if (i > 0) {
       mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B);
-      digitalWrite(DL_PIN, LOW);
+      digitalWrite(UL_PIN, LOW);
       e = mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, duty_percent);
-      digitalWrite(DR_PIN, HIGH);
+      digitalWrite(UR_PIN, HIGH);
       mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, MCPWM_DUTY_MODE_0);
     }
     //deadtime
     else if(i == 0) {
       mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B);
-      digitalWrite(DL_PIN, LOW);
+      digitalWrite(UL_PIN, LOW);
       mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A);
-      digitalWrite(DR_PIN, LOW);
+      digitalWrite(UR_PIN, LOW);
       delay(100);
     }
     //逆転
     else {
       mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A);
-      digitalWrite(DR_PIN, LOW);
+      digitalWrite(UR_PIN, LOW);
       e = mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, -duty_percent);
-      digitalWrite(DL_PIN, HIGH);
+      digitalWrite(UL_PIN, HIGH);
       mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, MCPWM_DUTY_MODE_0);
     }
 
